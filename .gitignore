@@ -25,3 +25,7 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Project data
+Data/
+Reprocess/

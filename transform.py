@@ -6,20 +6,37 @@ import logging
 logger = logging.getLogger("ETL_PIPELINE")
 
 
-def transform_data(df):
+def transform_data(
+    df,
+    quiet=False
+):
 
-    logger.info("Starting Transform step...")
+    # --------------------------------------------------
+    # TRANSFORM START
+    # --------------------------------------------------
 
-    # 1. Convert transaction_date to datetime
+    if not quiet:
+        logger.info(
+            "Starting Transform step..."
+        )
+
+    # --------------------------------------------------
+    # 1. CONVERT TRANSACTION DATE
+    # --------------------------------------------------
+
     df["transaction_date"] = pd.to_datetime(
         df["transaction_date"]
     )
 
-    logger.info(
-        "transaction_date converted to datetime"
-    )
+    if not quiet:
+        logger.info(
+            "transaction_date converted to datetime"
+        )
 
-    # 2. Clean text columns
+    # --------------------------------------------------
+    # 2. CLEAN TEXT COLUMNS
+    # --------------------------------------------------
+
     text_columns = [
         "customer_name",
         "product",
@@ -37,49 +54,86 @@ def transform_data(df):
             .str.strip()
         )
 
-    logger.info("Text columns cleaned")
+    if not quiet:
+        logger.info(
+            "Text columns cleaned"
+        )
 
-    # 3. Standardize status to uppercase
-    df["status"] = df["status"].str.upper()
+    # --------------------------------------------------
+    # 3. STANDARDIZE STATUS
+    # --------------------------------------------------
 
-    logger.info("Status standardized to uppercase")
+    df["status"] = (
+        df["status"]
+        .str.upper()
+    )
 
-    # 4. Recalculate total amount
+    if not quiet:
+        logger.info(
+            "Status standardized to uppercase"
+        )
+
+    # --------------------------------------------------
+    # 4. RECALCULATE TOTAL AMOUNT
+    # --------------------------------------------------
+
     df["total_amount"] = (
-        df["quantity"] *
+        df["quantity"]
+        *
         df["unit_price"]
     )
 
-    logger.info("total_amount recalculated")
+    if not quiet:
+        logger.info(
+            "total_amount recalculated"
+        )
 
-    # 5. Add transaction year
+    # --------------------------------------------------
+    # 5. ADD TRANSACTION YEAR
+    # --------------------------------------------------
+
     df["transaction_year"] = (
-        df["transaction_date"].dt.year
+        df["transaction_date"]
+        .dt.year
     )
 
-    # 6. Add transaction month
+    # --------------------------------------------------
+    # 6. ADD TRANSACTION MONTH
+    # --------------------------------------------------
+
     df["transaction_month"] = (
-        df["transaction_date"].dt.month
+        df["transaction_date"]
+        .dt.month
     )
 
-    # 7. Add successful transaction flag
+    # --------------------------------------------------
+    # 7. ADD SUCCESS FLAG
+    # --------------------------------------------------
+
     df["is_successful"] = (
         df["status"] == "SUCCESS"
     )
 
-    # 8. Add ETL processing timestamp
-    df["processed_date"] = pd.Timestamp.now()
+    # --------------------------------------------------
+    # 8. ADD PROCESSING TIMESTAMP
+    # --------------------------------------------------
 
-    logger.info(
-        "New columns added: "
-        "transaction_year, "
-        "transaction_month, "
-        "is_successful, "
-        "processed_date"
+    df["processed_date"] = (
+        pd.Timestamp.now()
     )
 
-    logger.info(
-        f"Records after transformation: {len(df)}"
-    )
+    if not quiet:
+        logger.info(
+            "New columns added: "
+            "transaction_year, "
+            "transaction_month, "
+            "is_successful, "
+            "processed_date"
+        )
+
+        logger.info(
+            f"Records after transformation: "
+            f"{len(df)}"
+        )
 
     return df

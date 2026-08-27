@@ -6,7 +6,7 @@ import pandas as pd
 logger = logging.getLogger("ETL_PIPELINE")
 
 
-def validate_data(df):
+def validate_data(df, save_rejections=True):
 
     logger.info("Starting Validation step...")
 
@@ -49,7 +49,7 @@ def validate_data(df):
     logger.info("Required columns check: PASSED")
 
     # --------------------------------------------------
-    # CREATE ERROR COLUMN
+    # CREATE VALIDATION ERROR COLUMN
     # --------------------------------------------------
 
     validation_errors = pd.Series(
@@ -68,11 +68,13 @@ def validate_data(df):
         f"Total missing values: {missing_values}"
     )
 
-    missing_mask = df[required_columns].isnull().any(axis=1)
+    missing_mask = df[
+        required_columns
+    ].isnull().any(axis=1)
 
-    validation_errors.loc[missing_mask] += (
-        "Missing required value; "
-    )
+    validation_errors.loc[
+        missing_mask
+    ] += "Missing required value; "
 
     # --------------------------------------------------
     # DUPLICATE TRANSACTION IDs
@@ -88,9 +90,9 @@ def validate_data(df):
         f"Duplicate transaction IDs: {duplicate_ids}"
     )
 
-    validation_errors.loc[duplicate_mask] += (
-        "Duplicate transaction ID; "
-    )
+    validation_errors.loc[
+        duplicate_mask
+    ] += "Duplicate transaction ID; "
 
     # --------------------------------------------------
     # INVALID QUANTITY
@@ -102,7 +104,9 @@ def validate_data(df):
         (df["quantity"] <= 0)
     )
 
-    invalid_quantity = invalid_quantity_mask.sum()
+    invalid_quantity = (
+        invalid_quantity_mask.sum()
+    )
 
     logger.info(
         f"Invalid quantity records: {invalid_quantity}"
@@ -110,9 +114,7 @@ def validate_data(df):
 
     validation_errors.loc[
         invalid_quantity_mask
-    ] += (
-        "Invalid quantity; "
-    )
+    ] += "Invalid quantity; "
 
     # --------------------------------------------------
     # INVALID UNIT PRICE
@@ -124,7 +126,9 @@ def validate_data(df):
         (df["unit_price"] <= 0)
     )
 
-    invalid_price = invalid_price_mask.sum()
+    invalid_price = (
+        invalid_price_mask.sum()
+    )
 
     logger.info(
         f"Invalid unit price records: {invalid_price}"
@@ -132,9 +136,7 @@ def validate_data(df):
 
     validation_errors.loc[
         invalid_price_mask
-    ] += (
-        "Invalid unit price; "
-    )
+    ] += "Invalid unit price; "
 
     # --------------------------------------------------
     # INVALID TOTAL AMOUNT
@@ -146,16 +148,57 @@ def validate_data(df):
         (df["total_amount"] <= 0)
     )
 
-    invalid_amount = invalid_amount_mask.sum()
+    invalid_amount = (
+        invalid_amount_mask.sum()
+    )
 
     logger.info(
-        f"Invalid total amount records: {invalid_amount}"
+        f"Invalid total amount records: "
+        f"{invalid_amount}"
     )
 
     validation_errors.loc[
         invalid_amount_mask
+    ] += "Invalid total amount; "
+
+    # --------------------------------------------------
+    # TOTAL AMOUNT CALCULATION CHECK
+    # --------------------------------------------------
+
+    calculated_total = (
+        df["quantity"] *
+        df["unit_price"]
+    )
+
+    invalid_calculation_mask = (
+        df["quantity"].notna()
+        &
+        df["unit_price"].notna()
+        &
+        df["total_amount"].notna()
+        &
+        (
+            abs(
+                df["total_amount"]
+                - calculated_total
+            ) > 0.01
+        )
+    )
+
+    invalid_calculation = (
+        invalid_calculation_mask.sum()
+    )
+
+    logger.info(
+        "Invalid total amount calculation "
+        f"records: {invalid_calculation}"
+    )
+
+    validation_errors.loc[
+        invalid_calculation_mask
     ] += (
-        "Invalid total amount; "
+        "Total amount does not match "
+        "quantity × unit price; "
     )
 
     # --------------------------------------------------
@@ -174,23 +217,26 @@ def validate_data(df):
         ~df["status"].isin(valid_statuses)
     )
 
-    invalid_status = invalid_status_mask.sum()
+    invalid_status = (
+        invalid_status_mask.sum()
+    )
 
     logger.info(
-        f"Invalid status records: {invalid_status}"
+        f"Invalid status records: "
+        f"{invalid_status}"
     )
 
     validation_errors.loc[
         invalid_status_mask
-    ] += (
-        "Invalid status; "
-    )
+    ] += "Invalid status; "
 
     # --------------------------------------------------
     # SEPARATE VALID AND INVALID RECORDS
     # --------------------------------------------------
 
-    invalid_mask = validation_errors != ""
+    invalid_mask = (
+        validation_errors != ""
+    )
 
     valid_df = df[
         ~invalid_mask
@@ -204,16 +250,21 @@ def validate_data(df):
     # CREATE REJECTED FOLDER
     # --------------------------------------------------
 
-    os.makedirs(
-        "rejected",
-        exist_ok=True
-    )
+    if save_rejections:
+
+        os.makedirs(
+            "rejected",
+            exist_ok=True
+        )
 
     # --------------------------------------------------
     # SAVE COMPLETE INVALID RECORDS
     # --------------------------------------------------
 
-    if not invalid_df.empty:
+    if (
+        save_rejections
+        and not invalid_df.empty
+    ):
 
         invalid_df.to_csv(
             "rejected/rejected_records.csv",
@@ -221,18 +272,25 @@ def validate_data(df):
         )
 
         logger.warning(
-            f"Rejected records saved: {len(invalid_df)}"
+            f"Rejected records saved: "
+            f"{len(invalid_df)}"
         )
 
     # --------------------------------------------------
     # SAVE ERROR INFORMATION
     # --------------------------------------------------
 
-    if not invalid_df.empty:
+    if (
+        save_rejections
+        and not invalid_df.empty
+    ):
 
         error_df = pd.DataFrame({
             "transaction_id":
-                invalid_df["transaction_id"],
+                invalid_df[
+                    "transaction_id"
+                ],
+
             "error":
                 validation_errors[
                     invalid_mask
@@ -253,11 +311,13 @@ def validate_data(df):
     # --------------------------------------------------
 
     logger.info(
-        f"Valid records: {len(valid_df)}"
+        f"Valid records: "
+        f"{len(valid_df)}"
     )
 
     logger.info(
-        f"Rejected records: {len(invalid_df)}"
+        f"Rejected records: "
+        f"{len(invalid_df)}"
     )
 
     logger.info(
